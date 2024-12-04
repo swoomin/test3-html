@@ -1,0 +1,435 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8"/>
+    <title>Number Sort Puzzle</title>
+    <style>
+        body {
+            font-family: Arial;
+        }
+        h1 {
+            text-align: center;
+        }
+        .container {
+            margin: auto;
+            width: 80%;
+        }
+        .radio-group, .button-group {
+            font-size: 1.3em;
+            margin: 1em auto;
+            width: fit-content;
+        }
+        .radio-group > input:first-child {
+            margin: 2em;
+        }
+        .button-group .time-area, .button-group .game-status {
+            margin-right: 1.5em;
+        }
+        .button-group > button {
+            font-size: 1.2em;
+            border: 1px solid grey;
+            border-radius: 5px;
+            background: linear-gradient(105deg, #ccc, #e8e8e8);
+            font-weight: bold;
+            margin: 0.3em 1.2em 0.3em 0;
+        }
+        .button-group > button:last-child {
+            margin-right: 0;
+        }
+        .play-area {
+            position:relative;
+            margin: auto;
+            margin-top: 2em;
+            width: 80%;
+            /* padding: 10px;*/
+            border: 2px solid gray;
+            /* display: flex;
+            flex-wrap: wrap;
+            justify-content: space-around;
+            align-items: center;
+            align-content: space-around; */
+            height: 20vh;
+            background-color: white;
+        }
+        .block {
+            position:absolute;
+            width: 19%;
+            height: 95%;
+            background-color: #2196f3;
+            box-shadow: 5px 5px 0 #9fcdff;
+            border-radius: 10px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            user-select: none;
+            font-size: 3em;
+            font-weight:bold;
+
+        }
+        .block:hover, .block.overlay {
+            background-color: #0a84ff;
+        }
+        .block:nth-child(5-n){
+            margin-bottom: 5px;
+        }
+        .block[value="0"] {
+            left: 0.5%;
+            top: 1.5%;
+        }
+        .block[value="1"] {
+            left: 20.5%;
+            top: 1.5%;
+        }
+        .block[value="2"] {
+            left: 40.5%;
+            top: 1.5%;
+        }
+        .block[value="3"] {
+            left: 60.5%;
+            top: 1.5%;
+        }
+        .block[value="4"] {
+            left: 80.5%;
+            top: 1.5%;
+        }
+        .block[value="5"] {
+            left: 0.5%;
+            top: 51%;
+        }
+        .block[value="6"] {
+            left: 20.5%;
+            top: 51%;
+        }
+        .block[value="7"] {
+            left: 40.5%;
+            top: 51%;
+        }
+        .block[value="8"] {
+            left: 60.5%;
+            top: 51%;
+        }
+        .block[value="9"] {
+            left: 80.5%;
+            top: 51%;
+        }
+        .block.dragging {
+            position: absolute;
+            z-index: 5;
+        }
+        .help-container {
+            border: 1px solid grey;
+            width: 80%;
+            margin: auto;
+            margin-top: 2em;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Number Sort</h1>
+
+    <div class="radio-group">
+        <span>Difficulty:</span>
+        <input type="radio" name="difficulty" value="5" checked>5 blocks / 1 to 10
+        <input type="radio" name="difficulty" value="10">10 blocks / 1 to 30
+    </div>
+    <div class="button-group">
+        <span class="time-area">Timer: <span id="timer">0.0</span>s</span>
+        <span class="game-status">READY</span>
+        <button id="startBtn">Start</button>
+        <button id="resetBtn" disabled>Reset</button>
+        <button id="stopBtn" disabled>Stop</button>
+    </div>
+    <div class="play-area"></div>
+    <div class="help-container">
+        <h3>HELP</h3>
+        <p>Press Start Button to start the game.</p>
+        <p>Click and drag the blocks to rearrange them.</p>
+        <p>Sort the blocks in ascending order top to bottom, then left to right.</p>
+    </div>
+</div>
+<script>
+    const playArea = document.querySelector('.play-area');
+    const startBtn = document.querySelector('#startBtn');
+    const resetBtn = document.querySelector('#resetBtn');
+    const stopBtn = document.querySelector('#stopBtn');
+    const timerEl = document.querySelector('#timer');
+    const radioBtn = document.querySelectorAll('input[type="radio"]');
+    let intervalId;
+    let startTime;
+    let elapsedTime = 0;
+    let isPlaying = false;
+    let clickLeft, clickTop; // position of mouse cursor in playArea.
+
+
+     // shuffle blocks in a certain order
+     function shuffle() {
+
+         const difficulty = document.querySelector('input[name="difficulty"]:checked').value;
+         const blocks = document.querySelectorAll('.block');
+         // 섞기 - 4, 1, 2, 0, 3
+
+         let reorder = []
+         if (difficulty == 5) {
+             reorder = [4,1,2,0,3];
+             blocks.forEach((x, idx) => {
+                 x.setAttribute("value", reorder[idx].toString());
+             })
+         }
+         // 섞기 - 7, 4, 1, 2, 8, 0, 6, 9, 5, 3
+         else if (difficulty == 10) {
+             reorder = [7,4,1,2,8, 0, 6, 9, 5, 3];
+             blocks.forEach((x, idx) => {
+                 x.setAttribute("value", reorder[idx].toString());
+             })
+         }
+    }
+
+
+    function createBlocks() {
+
+        const difficulty = document.querySelector('input[name="difficulty"]:checked').value;
+
+        playArea.innerHTML = "";
+        let blocks = [];
+        let blockNumbers = [];
+
+        for (let i = 1; i <= parseInt(difficulty); i++) {
+
+            let limit = difficulty == 5 ? 10 : 30;
+
+            let randomNum = parseInt(Math.random()*limit + 1);
+            while (blockNumbers.includes(randomNum)) {
+                randomNum = parseInt(Math.random()*limit + 1);
+            }
+            blockNumbers.push(randomNum);
+
+            let block = document.createElement("div");
+            block.classList.add("block");
+            block.innerText = randomNum.toString();
+            block.setAttribute("value", (i-1).toString());
+            blocks.push(block);
+        }
+
+        blocks.forEach((block, idx) => {
+            playArea.appendChild(block);
+            block.style.height = difficulty == 5 ? "95%" : "48%";
+        });
+    }
+
+    // check the position number in play area
+    function getNumInPlayArea(e) {
+        const difficulty = document.querySelector('input[name="difficulty"]:checked').value;
+
+        const eX = e.clientX;
+        const eY = e.clientY;
+        const { top, left, width, height } = playArea.getBoundingClientRect();
+
+        let res;
+        if (difficulty == 5) {
+            res = parseInt(parseInt(eX-left )*5 / parseInt(width))
+        }
+        else if (difficulty == 10) {
+            res = parseInt(eY - top)* 2 > parseInt(height) ?
+                 parseInt(parseInt(eX - left)*5 / parseInt(width) )+ 5
+                : parseInt(parseInt(eX - left )*5 / parseInt(width))
+        }
+
+        return res;
+    }
+
+/*    playArea.addEventListener('click', function(e){
+        console.log(getNumInPlayArea(e));
+    })*/
+
+    function updateTimer() {
+        elapsedTime += 0.1;
+        timerEl.innerText = elapsedTime.toFixed(1).toString();
+    }
+
+    // event occurs when mouse is clicked
+    function handleDragStart(e) {
+        if (!isPlaying) return;
+        e.target.classList.add('dragging');
+        clickLeft = e.clientX;
+        clickTop = e.clientY;
+    }
+
+    // event occurs when player release mouse button
+    function handleDragEnd(e) {
+        if (!isPlaying) return;
+
+        if (e.target.classList.contains('dragging')) {
+            const draggingNum = parseInt(e.target.getAttribute("value")); // value of dragging block
+            const res = getNumInPlayArea(e); // position number in playArea
+
+            // change value of blocks
+            if (draggingNum < res) { //
+                document.querySelectorAll('.block:not(.dragging)').forEach((x) => {
+                    const val = parseInt(x.getAttribute("value"));
+                    if (draggingNum < val && val <= res) x.setAttribute("value",  (val - 1).toString()); // reduce by 1
+                })
+            }
+            else if (draggingNum > res) {
+                document.querySelectorAll('.block:not(.dragging)').forEach((x) => {
+                    const val = parseInt(x.getAttribute("value"));
+                    if (res <= val && val < draggingNum) x.setAttribute("value", (val + 1).toString()); // add by 1
+                })
+            }
+            e.target.setAttribute("value", res);
+            e.target.classList.remove('dragging');
+            e.target.style.transform = ''; // move to
+            // remove overlay
+            document.querySelectorAll('.block').forEach((x, idx) => {
+                x.classList.remove('overlay');
+            })
+        }
+        // if blocks are arranged, the game is done
+        if (checkOrdered() && isPlaying) {
+            clearInterval(intervalId); // break stopwatch
+            setButtonsState(true, false, true, true);
+            isPlaying = false;
+            document.querySelector('.game-status').innerText = "CLEAR!!";
+        }
+    }
+
+    // add events when cursor is moved
+    function handleDrag(e) {
+        if (!isPlaying) return;
+        const draggingBlock = document.querySelector('.dragging');
+        if (draggingBlock) {
+
+            const blockValue = parseInt(draggingBlock.getAttribute("value"));
+            const { clientX, clientY } = e;
+            const { top, left , width, height } = playArea.getBoundingClientRect();
+            const { width:blockWidth, height:blockHeight } = draggingBlock.getBoundingClientRect();
+            const leftNum = blockValue % 5;
+            const topNum = parseInt(blockValue / 5);
+
+            const x = clientX - left - width*(leftNum / 5 + 0.005) - blockWidth / 2;
+            const y = clientY - top - height*(topNum / 2 + 0.01) - blockHeight / 2;
+            draggingBlock.style.transform = `translate(${x}px, ${y}px)`;
+            const res = getNumInPlayArea(e);
+            document.querySelectorAll('.block').forEach((x, idx) => {
+                x.classList.remove('overlay');
+                if (idx == res) x.classList.add('overlay');
+            })
+        }
+    }
+
+    // disable buttons in accordance with state
+    function setButtonsState(startBtnState, resetBtnState, stopBtnState, radioState) {
+        startBtn.disabled = startBtnState;
+        resetBtn.disabled = resetBtnState;
+        stopBtn.disabled = stopBtnState;
+        radioBtn.forEach(x=> {x.disabled = radioState})
+    }
+
+    // check whether number card is ordered
+    function checkOrdered() {
+        const blocks = document.querySelectorAll('.block');
+        const difficulty = document.querySelector('input[name="difficulty"]:checked').value;
+        let orderList = new Array(parseInt(difficulty));
+        blocks.forEach((block, idx) => {
+            const value = block.getAttribute("value");
+            orderList[value] = block.innerHTML;
+        })
+        const originalOrder = [...orderList];
+        orderList.sort((a,b) => (a -b));
+        return originalOrder.join(" ") == orderList.join(" ");
+    }
+
+    // start / restart game
+    function startGame() {
+        // initialize game
+        if (document.getElementById('timer').innerText == '0.0') {
+            startTime = new Date();
+            intervalId = setInterval(updateTimer, 100);
+            createBlocks();
+            if (checkOrdered()) shuffle(); // if arranged shuffle blocks
+            startBtn.innerText = 'Continue'; // change label of start button as continue로 변경
+        }
+        // restart after stopping game
+        else {
+            intervalId = setInterval(updateTimer, 100);
+        }
+        isPlaying = true;
+        setButtonsState(true, false, false, true);
+        document.querySelector('.game-status').innerText = "PLAYING"; // change status as Playing
+    }
+
+    // 게임 재시작
+    function resetGame() {
+        setButtonsState(false, false, true, false);
+        clearInterval(intervalId); // 타이머를 멈춥니다.
+        elapsedTime = 0; // 경과 시간을 초기화합니다.
+        timerEl.innerText = '0.0'; // 타이머 화면을 0으로 초기화합니다.
+        isPlaying = false; // 게임을 멈춥니다.
+
+        document.querySelector('.game-status').innerText = "READY";
+
+        startBtn.innerText = 'Start';
+
+        // make play-area empty
+        playArea.innerHTML = "";
+    }
+
+    // stop game
+    function stopGame() {
+        clearInterval(intervalId); // stop timer
+        isPlaying = false;
+        setButtonsState(false, false, true, true);
+        document.querySelector('.game-status').innerText = "STOPPED";
+    }
+
+    // resize play area when difficulty is changed
+    document.querySelectorAll('input[name="difficulty"]').forEach(x => {
+        x.addEventListener('change', function (e) {
+            playArea.style.height = e.target.value == 5 ? "20vh" : "40vh";
+        });
+    });
+
+    // event when player clicks mouse in play-area
+    playArea.addEventListener('mousedown', function(e){
+        if (e.target.classList.contains('block')) {
+            handleDragStart(e);
+        }
+    })
+
+    // event when player moves cursor in play-area
+    playArea.addEventListener('mousemove', function(e){
+        if (isPlaying && intervalId != undefined) {
+            if (e.target.classList.contains('dragging')) {
+                handleDrag(e);
+            }
+        }
+    })
+    // event when player releases mouse button or cursor is out of play-area
+    playArea.addEventListener('mouseup', (e) => {
+        handleDragEnd(e)
+    } )
+    playArea.addEventListener('mouseleave', (e) => {
+        handleDragEnd(e)
+    } )
+
+    // event when start button is clicked
+    startBtn.addEventListener('click', function() {
+        startGame();
+    });
+
+    // event when reset button is clicked
+    resetBtn.addEventListener('click', function() {
+        resetGame();
+    });
+
+    // event when stop button is clicked
+    stopBtn.addEventListener("click", function() {
+        stopGame();
+    });
+
+</script>
+</body>
+</html>
